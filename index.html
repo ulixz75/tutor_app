@@ -471,6 +471,37 @@
       </div>
     </div>
 
+    <div
+      id="name-modal"
+      class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden"
+    >
+      <div class="glass-pane rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-xl font-bold mb-4">¡Bienvenido/a!</h3>
+        <p class="text-slate-400 mb-4">
+          Por favor, ingresa tu nombre completo para personalizar tu
+          experiencia.
+        </p>
+        <form id="name-form">
+          <input
+            type="text"
+            id="name-input"
+            class="w-full bg-slate-700/80 rounded-lg p-3 mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Ej: Juan Pérez"
+            required
+          />
+          <div class="flex justify-end">
+            <button
+              type="submit"
+              id="save-name"
+              class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500"
+            >
+              Guardar Nombre
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script type="module">
       // Importaciones de Firebase
       import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -488,6 +519,8 @@
         query,
         serverTimestamp,
         orderBy,
+        getDoc,
+        setDoc,
       } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
       // CONFIGURACIÓN DE FIREBASE
@@ -540,16 +573,29 @@
       const cancelQuizBtn = document.getElementById("cancel-quiz");
       const menuToggle = document.getElementById("menu-toggle");
       const sidebar = document.getElementById("sidebar");
+      const nameModal = document.getElementById("name-modal");
+      const nameForm = document.getElementById("name-form");
+      const nameInput = document.getElementById("name-input");
 
       // AUTENTICACIÓN
-      onAuthStateChanged(auth, (user) => {
+      onAuthStateChanged(auth, async (user) => {
         if (user) {
           userId = user.uid;
-          userInfo.innerHTML = `<i class="fas fa-user-circle mr-2 text-slate-400"></i> ID: ${userId.substring(
-            0,
-            8
-          )}...`;
           loadChatHistory();
+
+          const userDocRef = doc(db, "users", userId);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists() && userDoc.data().name) {
+            const userName = userDoc.data().name;
+            userInfo.innerHTML = `<i class="fas fa-user-circle mr-2 text-slate-400"></i> ${userName}`;
+          } else {
+            userInfo.innerHTML = `<i class="fas fa-user-circle mr-2 text-slate-400"></i> ID: ${userId.substring(
+              0,
+              8
+            )}...`;
+            nameModal.classList.remove("hidden");
+          }
         } else {
           signInAnonymously(auth).catch(console.error);
         }
@@ -710,6 +756,24 @@
           sidebar.classList.toggle("hidden");
         });
       }
+
+      nameForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const userName = nameInput.value.trim();
+        if (userName && userId) {
+          const userDocRef = doc(db, "users", userId);
+          try {
+            await setDoc(userDocRef, { name: userName }, { merge: true });
+            userInfo.innerHTML = `<i class="fas fa-user-circle mr-2 text-slate-400"></i> ${userName}`;
+            nameModal.classList.add("hidden");
+          } catch (error) {
+            console.error("Error saving name:", error);
+            alert(
+              "Hubo un error al guardar tu nombre. Por favor, inténtalo de nuevo."
+            );
+          }
+        }
+      });
 
       // FUNCIÓN PARA VOLVER AL CHAT
       function goBackToChat() {
@@ -1092,13 +1156,13 @@ INSTRUCCIONES:
                                    ${question.options
                                      .map(
                                        (option, oIndex) => `
-                                       <button type="button" 
-                                               class="quiz-option w-full text-left p-3 rounded-lg transition-all duration-200 hover:bg-indigo-600/30 border border-slate-600 hover:border-indigo-400" 
-                                               data-question-index="${qIndex}" 
+                                       <button type="button"
+                                               class="quiz-option w-full text-left p-3 rounded-lg transition-all duration-200 hover:bg-indigo-600/30 border border-slate-600 hover:border-indigo-400"
+                                               data-question-index="${qIndex}"
                                                data-option-index="${oIndex}">
                                            <span class="font-semibold text-indigo-300">${String.fromCharCode(
                                              65 + oIndex
-                                           )}.</span> 
+                                           )}.</span>
                                            <span class="ml-2">${option}</span>
                                        </button>
                                    `
@@ -1111,7 +1175,7 @@ INSTRUCCIONES:
                          .join("")}
                    </div>
                    <div class="mt-8 text-center">
-                       <button id="submit-quiz" 
+                       <button id="submit-quiz"
                                class="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg font-semibold text-white shadow-lg transition-all duration-200 transform hover:scale-105">
                            <i class="fas fa-check mr-2"></i>Enviar Quiz
                        </button>
@@ -1210,7 +1274,7 @@ INSTRUCCIONES:
         const resultsHTML = `
                <div class="glass-pane rounded-lg p-6 max-w-4xl mx-auto">
                    <h3 class="text-2xl font-bold mb-6 text-center text-indigo-400">📊 Resultados del Quiz</h3>
-                   
+
                    <div class="text-center mb-8 p-6 bg-slate-700/50 rounded-lg border border-slate-600">
                        <div class="text-4xl font-bold ${performanceColor} mb-2">${score}/${totalQuestions}</div>
                        <div class="text-2xl ${performanceColor} mb-2">${percentage}%</div>
@@ -1230,7 +1294,7 @@ INSTRUCCIONES:
                                <div class="font-semibold mb-2 text-slate-200">
                                    ${index + 1}. ${result.question}
                                </div>
-                               
+
                                <div class="mb-2">
                                    <span class="${
                                      result.isCorrect
@@ -1244,7 +1308,7 @@ INSTRUCCIONES:
                                        }
                                    </span>
                                </div>
-                               
+
                                <div class="text-sm space-y-1">
                                    <div class="text-slate-300">
                                        <strong>Tu respuesta:</strong> ${
@@ -1269,11 +1333,11 @@ INSTRUCCIONES:
 
 
                    <div class="flex flex-col sm:flex-row justify-center gap-4">
-                       <button id="new-quiz" 
+                       <button id="new-quiz"
                                class="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-semibold transition-colors duration-200 flex items-center justify-center">
                            <i class="fas fa-redo mr-2"></i>Nuevo Quiz
                        </button>
-                       <button id="back-to-chat" 
+                       <button id="back-to-chat"
                                class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-semibold transition-colors duration-200 flex items-center justify-center">
                            <i class="fas fa-arrow-left mr-2"></i>Volver al Chat
                        </button>
